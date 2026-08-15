@@ -423,6 +423,14 @@ This project uses **major version numbering only** (1, 2, 3...). No semver.
 
 ## Version History
 
+### v11 (2026-08-16)
+- Renamed the domain to `nopro200_claude_usage` so this fork installs alongside the upstream
+  integration instead of colliding with it
+- Display name is now "NoPro200 - Claude Usage" in `manifest.json` and `hacs.json`
+- `codeowners`, `documentation` and `issue_tracker` point at this fork, not upstream
+- Added `.github/workflows/release.yml`; a tag push now publishes the GitHub Release
+- Added `.gitignore` for `__pycache__`
+
 ### v10 (2026-08-16)
 - Usage data can be read through a CLIProxyAPI instance instead of Anthropic directly
 - Config flow starts with a source menu; reconfigure can move an entry between sources

@@ -9,5 +9,5 @@
   "issue_tracker": "https://github.com/NoPro200/hass-claude-usage/issues",
   "requirements": [],
   "single_config_entry": false,
-  "version": "10"
+  "version": "11"
 }
