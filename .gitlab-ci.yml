@@ -177,6 +177,11 @@ publish-release:
     ref: $CI_COMMIT_SHA
     assets:
       links:
+        # "raw" serves the file itself; "file" would only render GitLab's
+        # artifact browser page, costing the reader an extra click.
+        # filepath additionally exposes it under the stable URL
+        # <project>/-/releases/<tag>/downloads/hass_claude_usage.zip
         - name: hass_claude_usage.zip
-          url: $CI_PROJECT_URL/-/jobs/$BUILD_JOB_ID/artifacts/file/hass_claude_usage.zip
+          url: $CI_PROJECT_URL/-/jobs/$BUILD_JOB_ID/artifacts/raw/hass_claude_usage.zip
+          filepath: /hass_claude_usage.zip
           link_type: package
