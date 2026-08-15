@@ -4,7 +4,7 @@ name: Release
 # which version is available, so this is what makes an update reach users.
 #
 # Releasing:
-#   1. bump "version" in custom_components/hass_claude_usage/manifest.json
+#   1. bump "version" in custom_components/nopro200_claude_usage/manifest.json
 #   2. commit and push
 #   3. git tag v11 && git push origin v11
 # The tag must equal the manifest version - the job below fails otherwise, so a
@@ -31,7 +31,7 @@ jobs:
       # repository, so accept either and compare without the prefix.
       - name: Verify manifest version matches tag
         run: |
-          VERSION=$(python3 -c "import json; print(json.load(open('custom_components/hass_claude_usage/manifest.json'))['version'])")
+          VERSION=$(python3 -c "import json; print(json.load(open('custom_components/nopro200_claude_usage/manifest.json'))['version'])")
           TAG="${GITHUB_REF_NAME}"
           if [ "$VERSION" != "${TAG#v}" ]; then
             echo "::error::manifest.json version '$VERSION' does not match tag '$TAG'"
@@ -47,8 +47,8 @@ jobs:
           python3 - <<'PY'
           import pathlib, zipfile
 
-          src = pathlib.Path("custom_components/hass_claude_usage")
-          with zipfile.ZipFile("hass_claude_usage.zip", "w", zipfile.ZIP_DEFLATED) as z:
+          src = pathlib.Path("custom_components/nopro200_claude_usage")
+          with zipfile.ZipFile("nopro200_claude_usage.zip", "w", zipfile.ZIP_DEFLATED) as z:
               for path in sorted(src.rglob("*")):
                   if path.is_file() and "__pycache__" not in path.parts:
                       z.write(path, pathlib.Path(src.name) / path.relative_to(src))
@@ -62,4 +62,4 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" \
             --title "${RELEASE_NAME}" \
             --generate-notes \
-            hass_claude_usage.zip
+            nopro200_claude_usage.zip

@@ -1,6 +1,10 @@
-# Claude Usage - Home Assistant Integration
+# NoPro200 - Claude Usage
 
 A custom Home Assistant integration that monitors your Claude (Anthropic) subscription usage.
+
+A fork of [trickv/hass-claude-usage](https://github.com/trickv/hass-claude-usage) (MIT), adding a
+CLI Proxy API data source. It uses the domain `nopro200_claude_usage` so it installs alongside the
+original rather than replacing it.
 
 ![Claude Usage Screenshot](screenshot.jpg)
 
@@ -22,14 +26,18 @@ A custom Home Assistant integration that monitors your Claude (Anthropic) subscr
 
 ### HACS (recommended)
 
-1. Search for "Claude Usage" in HACS and install it
-2. Restart Home Assistant
-3. Go to Settings → Devices & Services → Add Integration → "Claude Usage"
-4. Follow the instructions
+This fork is not in the HACS default store, so add it as a custom repository first:
+
+1. HACS → three-dot menu → **Custom repositories**
+2. Repository: `https://github.com/NoPro200/hass-claude-usage`, type: **Integration** → Add
+3. Search for "NoPro200 - Claude Usage" in HACS and install it
+4. Restart Home Assistant
+5. Go to Settings → Devices & Services → Add Integration → "NoPro200 - Claude Usage"
+6. Follow the instructions
 
 ### Manual
 
-1. Copy `custom_components/hass_claude_usage/` to your HA `custom_components/` directory
+1. Copy `custom_components/nopro200_claude_usage/` to your HA `custom_components/` directory
 2. Restart Home Assistant
 3. Add the integration via the UI
 
@@ -107,9 +115,9 @@ This will run black, isort, ruff, and other checks before each commit.
 
 ```bash
 pip install black isort ruff
-black custom_components/hass_claude_usage/
-isort custom_components/hass_claude_usage/
-ruff check --fix custom_components/hass_claude_usage/
+black custom_components/nopro200_claude_usage/
+isort custom_components/nopro200_claude_usage/
+ruff check --fix custom_components/nopro200_claude_usage/
 ```
 
 ## License

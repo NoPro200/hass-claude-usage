@@ -25,20 +25,20 @@ jobs:
 
       - name: Check Python syntax
         run: |
-          python -m py_compile custom_components/hass_claude_usage/*.py
+          python -m py_compile custom_components/nopro200_claude_usage/*.py
 
       - name: Run ruff (linter)
         run: |
-          ruff check custom_components/hass_claude_usage/
+          ruff check custom_components/nopro200_claude_usage/
 
       - name: Check code formatting with black
         run: |
-          black --check custom_components/hass_claude_usage/ || (
+          black --check custom_components/nopro200_claude_usage/ || (
             echo "❌ Code formatting check failed!"
             echo ""
             echo "To fix, run:"
             echo "  python3 -m pip install black"
-            echo "  black custom_components/hass_claude_usage/"
+            echo "  black custom_components/nopro200_claude_usage/"
             echo "  git add -u && git commit -m 'Format code with black'"
             echo ""
             echo "Or use the pre-commit hook (see .pre-commit-config.yaml)"
@@ -47,7 +47,7 @@ jobs:
 
       - name: Check import sorting with isort
         run: |
-          isort --check-only custom_components/hass_claude_usage/
+          isort --check-only custom_components/nopro200_claude_usage/
 
   markdown-link-check:
     name: Markdown Link Check
@@ -69,5 +69,5 @@ jobs:
 
       - name: Validate manifest.json
         run: |
-          python -m json.tool custom_components/hass_claude_usage/manifest.json > /dev/null
+          python -m json.tool custom_components/nopro200_claude_usage/manifest.json > /dev/null
           echo "manifest.json is valid JSON"

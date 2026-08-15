@@ -4,7 +4,7 @@
 # builds an installable zip and publishes a GitLab Release.
 #
 # Releasing (matches the process in AGENTS.md):
-#   1. bump "version" in custom_components/hass_claude_usage/manifest.json
+#   1. bump "version" in custom_components/nopro200_claude_usage/manifest.json
 #   2. commit and push
 #   3. git tag 10 && git push gitlab 10
 # The tag must equal the manifest version - verify-version fails the pipeline
@@ -17,7 +17,7 @@ stages:
   - release
 
 variables:
-  COMPONENT: custom_components/hass_claude_usage
+  COMPONENT: custom_components/nopro200_claude_usage
 
 default:
   image: python:3.12-slim
@@ -49,7 +49,7 @@ json-lint:
     - |
       python - <<'PY'
       import json, sys, pathlib
-      base = pathlib.Path("custom_components/hass_claude_usage")
+      base = pathlib.Path("custom_components/nopro200_claude_usage")
       a = json.loads((base / "strings.json").read_text(encoding="utf-8"))
       b = json.loads((base / "translations/en.json").read_text(encoding="utf-8"))
       if a != b:
@@ -73,13 +73,13 @@ integration-loads:
     - cd build
     - |
       python - <<'PY'
-      from custom_components.hass_claude_usage import (
+      from custom_components.nopro200_claude_usage import (
           DOMAIN,
           PLATFORMS,
           async_setup_entry,
           async_unload_entry,
       )
-      from custom_components.hass_claude_usage import cliproxy, config_flow, sensor
+      from custom_components.nopro200_claude_usage import cliproxy, config_flow, sensor
 
       print(f"imported {DOMAIN}, platforms: {PLATFORMS}")
       assert config_flow.ClaudeUsageConfigFlow.VERSION == 2
@@ -121,8 +121,8 @@ build-release:
     - |
       python - <<'PY'
       import pathlib, zipfile
-      src = pathlib.Path("custom_components/hass_claude_usage")
-      with zipfile.ZipFile("hass_claude_usage.zip", "w", zipfile.ZIP_DEFLATED) as z:
+      src = pathlib.Path("custom_components/nopro200_claude_usage")
+      with zipfile.ZipFile("nopro200_claude_usage.zip", "w", zipfile.ZIP_DEFLATED) as z:
           for path in sorted(src.rglob("*")):
               if path.is_file() and "__pycache__" not in path.parts:
                   z.write(path, pathlib.Path(src.name) / path.relative_to(src))
@@ -150,7 +150,7 @@ build-release:
     - echo "RELEASE_NAME=v${CI_COMMIT_TAG#v}" >> build.env
   artifacts:
     paths:
-      - hass_claude_usage.zip
+      - nopro200_claude_usage.zip
       - release_notes.md
     reports:
       dotenv: build.env
@@ -180,8 +180,8 @@ publish-release:
         # "raw" serves the file itself; "file" would only render GitLab's
         # artifact browser page, costing the reader an extra click.
         # filepath additionally exposes it under the stable URL
-        # <project>/-/releases/<tag>/downloads/hass_claude_usage.zip
-        - name: hass_claude_usage.zip
-          url: $CI_PROJECT_URL/-/jobs/$BUILD_JOB_ID/artifacts/raw/hass_claude_usage.zip
-          filepath: /hass_claude_usage.zip
+        # <project>/-/releases/<tag>/downloads/nopro200_claude_usage.zip
+        - name: nopro200_claude_usage.zip
+          url: $CI_PROJECT_URL/-/jobs/$BUILD_JOB_ID/artifacts/raw/nopro200_claude_usage.zip
+          filepath: /nopro200_claude_usage.zip
           link_type: package

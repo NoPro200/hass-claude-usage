@@ -355,11 +355,11 @@ pip install homeassistant
 # Validate manifest
 python3 -m homeassistant.scripts.check_config \
   --script check_config \
-  --files custom_components/hass_claude_usage/manifest.json
+  --files custom_components/nopro200_claude_usage/manifest.json
 
 # Type checking (if adding type hints)
 pip install mypy
-mypy custom_components/hass_claude_usage/
+mypy custom_components/nopro200_claude_usage/
 ```
 
 ## References
@@ -386,13 +386,13 @@ This project uses **major version numbering only** (1, 2, 3...). No semver.
 
 1. **Update manifest.json version**:
    ```bash
-   # Edit custom_components/hass_claude_usage/manifest.json
+   # Edit custom_components/nopro200_claude_usage/manifest.json
    # Change "version": "2" to "version": "3"
    ```
 
 2. **Commit the version bump**:
    ```bash
-   git add custom_components/hass_claude_usage/manifest.json
+   git add custom_components/nopro200_claude_usage/manifest.json
    git commit -m "Bump version to 3"
    git push
    ```

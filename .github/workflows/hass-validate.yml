@@ -45,7 +45,7 @@ jobs:
       - name: Copy integration to custom_components
         run: |
           mkdir -p config/custom_components
-          cp -r custom_components/hass_claude_usage config/custom_components/
+          cp -r custom_components/nopro200_claude_usage config/custom_components/
 
       - name: Test integration import
         run: |
@@ -55,7 +55,7 @@ jobs:
 
           # Try to import the integration
           try:
-              from custom_components.hass_claude_usage import (
+              from custom_components.nopro200_claude_usage import (
                   DOMAIN,
                   PLATFORMS,
                   async_setup_entry,

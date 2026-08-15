@@ -1,6 +1,6 @@
 """Constants for Claude Usage integration."""
 
-DOMAIN = "hass_claude_usage"
+DOMAIN = "nopro200_claude_usage"
 
 # OAuth
 OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"

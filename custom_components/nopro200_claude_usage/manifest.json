@@ -1,0 +1,13 @@
+{
+  "domain": "nopro200_claude_usage",
+  "name": "NoPro200 - Claude Usage",
+  "codeowners": ["@NoPro200"],
+  "config_flow": true,
+  "documentation": "https://github.com/NoPro200/hass-claude-usage",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/NoPro200/hass-claude-usage/issues",
+  "requirements": [],
+  "single_config_entry": false,
+  "version": "10"
+}
