@@ -397,16 +397,22 @@ This project uses **major version numbering only** (1, 2, 3...). No semver.
    git push
    ```
 
-3. **Create git tag**:
+3. **Create and push the git tag** — this is the whole release:
    ```bash
-   git tag 3
-   git push origin 3
+   git tag v3
+   git push origin v3
    ```
 
-4. **Create GitHub release** (generates release notes automatically from commits):
-   ```bash
-   gh release create 3 --title "v3" --generate-notes
-   ```
+   `.github/workflows/release.yml` takes it from there: it verifies the tag
+   matches the manifest version, packages the integration, and publishes a
+   GitHub Release with generated notes and the zip attached. A tag that
+   disagrees with `manifest.json` fails the workflow instead of shipping.
+
+   Tags exist in both spellings here (`2`-`4` bare, `v5` onward prefixed).
+   Either works; prefer the `v` prefix to match the recent ones.
+
+   `.gitlab-ci.yml` mirrors this for the GitLab remote. It is kept because the
+   project is also pushed there, but GitHub is what HACS reads.
 
 ### HACS Requirements
 

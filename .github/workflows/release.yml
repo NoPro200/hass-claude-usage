@@ -1,0 +1,65 @@
+name: Release
+
+# Tagging publishes a GitHub Release. HACS reads the release tag to decide
+# which version is available, so this is what makes an update reach users.
+#
+# Releasing:
+#   1. bump "version" in custom_components/hass_claude_usage/manifest.json
+#   2. commit and push
+#   3. git tag v11 && git push origin v11
+# The tag must equal the manifest version - the job below fails otherwise, so a
+# release can never ship a version HACS would refuse to install.
+
+on:
+  push:
+    tags:
+      - '*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # --generate-notes needs the history, not a shallow clone
+
+      # Tags have been written both bare ("4") and v-prefixed ("v9") in this
+      # repository, so accept either and compare without the prefix.
+      - name: Verify manifest version matches tag
+        run: |
+          VERSION=$(python3 -c "import json; print(json.load(open('custom_components/hass_claude_usage/manifest.json'))['version'])")
+          TAG="${GITHUB_REF_NAME}"
+          if [ "$VERSION" != "${TAG#v}" ]; then
+            echo "::error::manifest.json version '$VERSION' does not match tag '$TAG'"
+            exit 1
+          fi
+          echo "RELEASE_NAME=v${VERSION}" >> "$GITHUB_ENV"
+          echo "manifest version matches tag: $TAG"
+
+      # Zip the integration folder itself, so it extracts straight into
+      # <config>/custom_components/ the way the README describes.
+      - name: Package integration
+        run: |
+          python3 - <<'PY'
+          import pathlib, zipfile
+
+          src = pathlib.Path("custom_components/hass_claude_usage")
+          with zipfile.ZipFile("hass_claude_usage.zip", "w", zipfile.ZIP_DEFLATED) as z:
+              for path in sorted(src.rglob("*")):
+                  if path.is_file() and "__pycache__" not in path.parts:
+                      z.write(path, pathlib.Path(src.name) / path.relative_to(src))
+              print("packaged:", len(z.namelist()), "files")
+          PY
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${RELEASE_NAME}" \
+            --generate-notes \
+            hass_claude_usage.zip
