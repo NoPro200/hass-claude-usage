@@ -25,6 +25,30 @@ Refactored from a standalone daemon concept originally explored in the `cc-playg
 - OAuth tokens can be refreshed automatically without user intervention
 - Matches the authentication pattern used by Claude Code CLI
 
+### CLIProxyAPI as an Alternative Transport
+
+**Decision:** Let an entry read usage through a [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)
+instance instead of holding its own OAuth tokens, selected by a `source` key
+(`"official"` | `"cliproxy"`) in the entry data.
+
+**Rationale:**
+- Users who already run the proxy have the accounts and refreshed tokens there; a second OAuth
+  copy/paste and a second token store in HA is duplicated state that can drift
+- The proxy relays the response unchanged, so `_parse_usage` / `_parse_limits` and the whole sensor
+  platform are untouched — only the transport differs
+- The proxy already lists its accounts, so multi-account setup becomes a dropdown
+
+**Why not a plain custom base URL:** CLIProxyAPI serves only inference endpoints (`/v1/messages` …)
+plus its management API. It has no route for `/api/oauth/usage` — a base-URL swap 404s. The
+transport therefore goes through the management API (see API Discoveries below).
+
+**No migration:** entries predating this read `data.get(CONF_SOURCE, SOURCE_OFFICIAL)`, so
+`VERSION` stays at 2.
+
+**Trade-off accepted:** the management key is far more privileged than an OAuth token — it can
+rewrite the proxy config, read its logs, and issue arbitrary requests with *any* credential it
+holds. This is stated in the config flow and the README; it makes the feature trusted-network only.
+
 ### DataUpdateCoordinator Pattern
 
 **Decision:** Use Home Assistant's `DataUpdateCoordinator` for data management.
@@ -105,6 +129,42 @@ Refactored from a standalone daemon concept originally explored in the `cc-playg
 - Free tier returns empty object `{}`
 - Extra usage only present if enabled by user
 - Credits are in cents (U.S. currency)
+
+### CLIProxyAPI Management API
+
+Two routes are used, both requiring `Authorization: Bearer <MANAGEMENT_KEY>`:
+
+**`GET /v0/management/auth-files`** — lists stored credentials. Entries carry `auth_index`,
+`provider`, `email`, `status` and `last_refresh`. Filter on `provider == "claude"`.
+
+**`POST /v0/management/api-call`** — performs one outbound request with a stored credential:
+
+```json
+{
+  "auth_index": "<from auth-files>",
+  "method": "GET",
+  "url": "https://api.anthropic.com/api/oauth/usage",
+  "header": {"Authorization": "Bearer $TOKEN$", "anthropic-beta": "oauth-2025-04-20"}
+}
+```
+
+The proxy replaces `$TOKEN$` with the credential's `metadata.access_token`. The reply is **always**
+HTTP 200 with an envelope — the upstream status and payload live inside it, and the payload is a
+JSON **string**, so it must be decoded twice:
+
+```json
+{"status_code": 200, "header": {...}, "body": "{\"five_hour\": ...}"}
+```
+
+**Footgun — an unknown `auth_index` fails silently.** In `internal/api/handlers/management/api_tools.go`
+the handler resolves the index to `nil`, skips its own error branch because `auth != nil` is false,
+and then `continue`s past the substitution — leaving the header as the literal string
+`Bearer $TOKEN$`. Anthropic answers 401. The proxy reports no error of its own, so a 401 here is
+ambiguous: either the credential went stale, or the stored `auth_index` moved. The coordinator
+therefore re-resolves the index by account email once before treating a 401 as an auth failure.
+
+**Deployment note:** the instance needs `remote-management.allow-remote: true` when HA is not on
+the same host.
 
 ### OAuth Configuration
 
@@ -248,7 +308,7 @@ challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
 ### Non-Goals
 
 - **Real-time Updates:** Usage data is inherently delayed (5-hour buckets), no value in frequent polling
-- **Multiple Accounts:** Integration supports one Claude account per HA instance (create multiple config entries if needed)
+- **Multiple Accounts Per Entry:** One entry tracks one Claude account; add another entry for another account
 - **API Key Auth:** Not supported by the usage endpoint, OAuth-only
 
 ## Testing Recommendations
@@ -356,6 +416,13 @@ This project uses **major version numbering only** (1, 2, 3...). No semver.
 - Version must be compatible with AwesomeVersion (simple integers work fine)
 
 ## Version History
+
+### v10 (2026-08-16)
+- Usage data can be read through a CLIProxyAPI instance instead of Anthropic directly
+- Config flow starts with a source menu; reconfigure can move an entry between sources
+- New `cliproxy.py` holds the management-API transport
+- Coordinator re-resolves a moved `auth_index` by account email before failing auth
+- Unified the OAuth setup and reauth steps, which had drifted into near-duplicates
 
 ### v2 (2026-02-06)
 - Renamed "Weekly Usage" to "Week Usage"

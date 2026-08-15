@@ -35,12 +35,40 @@ A custom Home Assistant integration that monitors your Claude (Anthropic) subscr
 
 ## Setup
 
-The integration uses Anthropic's OAuth flow:
+When adding the integration you pick where its data should come from.
+
+### Official Claude servers
+
+Uses Anthropic's OAuth flow:
 
 1. When adding the integration, you'll be shown an authorization URL
 2. Open the URL in your browser and log in to your Anthropic account
 3. After authorizing, you'll be redirected to a page with an authorization code
 4. Copy the code and paste it into the Home Assistant config flow
+
+### CLI Proxy API
+
+If you already run [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) with your Claude
+accounts signed in, the integration can read usage through it instead. There is no second login,
+and Home Assistant stores no Claude tokens — the instance signs each request with a credential it
+already keeps refreshed.
+
+1. Enter the address of your instance (e.g. `http://192.168.1.50:8317`) and its management key
+2. Pick which of its Claude accounts this entry should track
+3. Repeat the setup to add further accounts
+
+Each entry tracks one account, exactly as with the OAuth flow. An existing entry can be moved
+between the two sources via **Reconfigure** without losing its sensors or their history.
+
+Requirements and caveats:
+
+- The instance needs `remote-management.allow-remote: true` unless Home Assistant runs on the
+  same host.
+- The management key grants full control over the instance — its configuration, its logs and every
+  credential it holds. It is stored in plain text in Home Assistant's configuration, so treat this
+  as trusted-network only.
+- If an account's credential expires inside CLIProxyAPI, sign it in again **there**; Home Assistant
+  cannot refresh it on the instance's behalf.
 
 ## Options
 
