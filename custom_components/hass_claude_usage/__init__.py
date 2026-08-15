@@ -16,18 +16,25 @@ from homeassistant.helpers import aiohttp_client
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import slugify
 
+from . import cliproxy
 from .const import (
     API_BETA_HEADER,
     CONF_ACCESS_TOKEN,
+    CONF_ACCOUNT_EMAIL,
     CONF_ACCOUNT_ID,
+    CONF_AUTH_INDEX,
+    CONF_BASE_URL,
     CONF_EXPIRES_AT,
+    CONF_MANAGEMENT_KEY,
     CONF_REFRESH_TOKEN,
+    CONF_SOURCE,
     CONF_UPDATE_INTERVAL,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
     OAUTH_CLIENT_ID,
     OAUTH_TOKEN_URL,
     PROFILE_API_URL,
+    SOURCE_CLIPROXY,
     USAGE_API_URL,
 )
 
@@ -191,7 +198,15 @@ class ClaudeUsageCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
 
     async def _async_update_data(self) -> dict[str, Any]:
-        """Fetch usage data from the API."""
+        """Fetch usage data from whichever source this entry was set up with."""
+        if self.config_entry.data.get(CONF_SOURCE) == SOURCE_CLIPROXY:
+            raw = await self._fetch_via_cliproxy()
+        else:
+            raw = await self._fetch_official()
+        return _parse_usage(raw)
+
+    async def _fetch_official(self) -> dict[str, Any]:
+        """Fetch the usage payload straight from Anthropic with our own token."""
         await self._ensure_valid_token()
 
         access_token = self.config_entry.data[CONF_ACCESS_TOKEN]
@@ -208,11 +223,82 @@ class ClaudeUsageCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             if resp.status == 401:
                 raise ConfigEntryAuthFailed("Authentication failed - token may be invalid")
             resp.raise_for_status()
-            raw = await resp.json()
+            return await resp.json()
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"Error fetching usage data: {err}") from err
 
-        return _parse_usage(raw)
+    async def _fetch_via_cliproxy(self) -> dict[str, Any]:
+        """Fetch the usage payload through a CLIProxyAPI instance.
+
+        No token handling is needed here: the proxy signs the request with a
+        credential it already refreshes. A 401 is ambiguous though — the stored
+        auth_index may simply have moved, in which case the proxy forwards an
+        unsubstituted placeholder rather than reporting an error. Re-resolve the
+        index by account email once before treating it as an auth failure.
+        """
+        base_url = self.config_entry.data[CONF_BASE_URL]
+        management_key = self.config_entry.data[CONF_MANAGEMENT_KEY]
+        session = aiohttp_client.async_get_clientsession(self.hass)
+
+        for attempt in ("stored", "resolved"):
+            auth_index = self.config_entry.data[CONF_AUTH_INDEX]
+            try:
+                status, body = await cliproxy.async_api_call(
+                    session, base_url, management_key, auth_index, USAGE_API_URL
+                )
+            except cliproxy.CliProxyAuthError as err:
+                raise ConfigEntryAuthFailed(str(err)) from err
+            except cliproxy.CliProxyCredentialError as err:
+                if attempt == "stored" and await self._reresolve_auth_index():
+                    continue
+                raise ConfigEntryAuthFailed(str(err)) from err
+            except cliproxy.CliProxyError as err:
+                raise UpdateFailed(str(err)) from err
+
+            if status == 401:
+                if attempt == "stored" and await self._reresolve_auth_index():
+                    continue
+                raise ConfigEntryAuthFailed(
+                    "Anthropic rejected the credential held by CLI Proxy API - "
+                    "sign that account in again there"
+                )
+            if status != 200:
+                raise UpdateFailed(f"CLI Proxy API relayed HTTP {status} from the usage API")
+            if not isinstance(body, dict):
+                raise UpdateFailed("CLI Proxy API relayed an unreadable usage payload")
+            return body
+
+        raise UpdateFailed("Could not fetch usage data through CLI Proxy API")
+
+    async def _reresolve_auth_index(self) -> bool:
+        """Look the proxy credential up again by account email.
+
+        Returns True when a different auth_index was found and persisted, so the
+        caller knows a retry is worth making.
+        """
+        data = self.config_entry.data
+        email = data.get(CONF_ACCOUNT_EMAIL)
+        if not email:
+            return False
+
+        session = aiohttp_client.async_get_clientsession(self.hass)
+        try:
+            auths = await cliproxy.async_list_claude_auths(
+                session, data[CONF_BASE_URL], data[CONF_MANAGEMENT_KEY]
+            )
+        except cliproxy.CliProxyError:
+            _LOGGER.debug("Could not list CLI Proxy API credentials while re-resolving")
+            return False
+
+        auth_index = cliproxy.auth_index_for_email(auths, email)
+        if not auth_index or auth_index == data.get(CONF_AUTH_INDEX):
+            return False
+
+        _LOGGER.info("CLI Proxy API auth_index for %s changed; updating the entry", email)
+        self.hass.config_entries.async_update_entry(
+            self.config_entry, data={**data, CONF_AUTH_INDEX: auth_index}
+        )
+        return True
 
     async def _ensure_valid_token(self) -> None:
         """Refresh the access token if expired."""

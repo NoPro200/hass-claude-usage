@@ -2,6 +2,22 @@
   "config": {
     "step": {
       "user": {
+        "title": "Choose a data source",
+        "description": "Usage data can be read straight from Anthropic, or through a CLI Proxy API instance that already holds your Claude accounts.",
+        "menu_options": {
+          "official": "Official Claude servers",
+          "cliproxy": "CLI Proxy API"
+        }
+      },
+      "reconfigure": {
+        "title": "Change this entry's data source",
+        "description": "Pick where this entry should read usage data from. Its sensors and their history are kept either way.",
+        "menu_options": {
+          "official": "Official Claude servers",
+          "cliproxy": "CLI Proxy API"
+        }
+      },
+      "official": {
         "title": "Authenticate with Claude",
         "description": "To authenticate, [open this link]({url}) to log in with Anthropic.\n\nAfter authorizing, paste the authorization code below.\n\nNote: The code may include a '#' character - paste the entire string.",
         "data": {
@@ -14,11 +30,39 @@
         "data": {
           "auth_code": "Authorization Code"
         }
+      },
+      "cliproxy": {
+        "title": "Connect to CLI Proxy API",
+        "description": "Enter the address of your CLI Proxy API instance and its management key. Home Assistant will then let you pick one of the Claude accounts stored there — no separate login is needed, and no tokens are kept here.\n\nIf Home Assistant does not run on the same host as the instance, that instance needs `remote-management.allow-remote: true`.\n\nSecurity note: the management key grants full control over the instance, including its configuration, its logs and all credentials it holds. It is stored in plain text in Home Assistant's configuration.",
+        "data": {
+          "base_url": "CLI Proxy API address",
+          "management_key": "Management key"
+        }
+      },
+      "reauth_cliproxy": {
+        "title": "Reconnect to CLI Proxy API",
+        "description": "This entry can no longer read its usage data. Confirm the connection details below and pick the account again.\n\nIf the account is listed but keeps failing, its Claude credential has expired inside CLI Proxy API — sign that account in again there, then come back here.",
+        "data": {
+          "base_url": "CLI Proxy API address",
+          "management_key": "Management key"
+        }
+      },
+      "cliproxy_account": {
+        "title": "Choose a Claude account",
+        "description": "These are the Claude accounts stored in your CLI Proxy API instance. Each entry tracks one account; run this setup again to add another.",
+        "data": {
+          "auth_index": "Claude account"
+        }
       }
     },
     "error": {
       "missing_code": "Please enter the authorization code",
-      "exchange_failed": "Failed to exchange code for tokens. Please try again."
+      "exchange_failed": "Failed to exchange code for tokens. Please try again.",
+      "invalid_base_url": "Enter a full address including http:// or https://",
+      "cannot_connect": "Could not reach the CLI Proxy API instance at that address",
+      "invalid_auth": "The instance rejected that management key",
+      "no_claude_accounts": "That instance has no Claude accounts stored. Sign one in there first.",
+      "credential_rejected": "Anthropic rejected that account's credential. Sign it in again inside CLI Proxy API."
     },
     "abort": {
       "already_configured": "This Claude account is already configured",
