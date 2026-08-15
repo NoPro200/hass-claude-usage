@@ -1,0 +1,182 @@
+# GitLab CI for the Claude Usage integration.
+#
+# Lint and structural checks run on every push. Tagging a commit additionally
+# builds an installable zip and publishes a GitLab Release.
+#
+# Releasing (matches the process in AGENTS.md):
+#   1. bump "version" in custom_components/hass_claude_usage/manifest.json
+#   2. commit and push
+#   3. git tag 10 && git push gitlab 10
+# The tag must equal the manifest version - verify-version fails the pipeline
+# otherwise, so a release can never ship a mismatched version.
+
+stages:
+  - lint
+  - validate
+  - build
+  - release
+
+variables:
+  COMPONENT: custom_components/hass_claude_usage
+
+default:
+  image: python:3.12-slim
+  interruptible: true
+
+# --- lint -------------------------------------------------------------
+
+python-lint:
+  stage: lint
+  script:
+    - pip install --quiet --root-user-action=ignore ruff black isort
+    - python -m compileall -q $COMPONENT
+    - ruff check $COMPONENT/
+    - isort --check-only $COMPONENT/
+    - |
+      black --check $COMPONENT/ || {
+        echo "Formatting check failed. Fix with: black $COMPONENT/"
+        exit 1
+      }
+
+json-lint:
+  stage: lint
+  script:
+    - python -m json.tool $COMPONENT/manifest.json > /dev/null
+    - python -m json.tool hacs.json > /dev/null
+    - python -m json.tool $COMPONENT/strings.json > /dev/null
+    # strings.json and the English translation must stay in lockstep, otherwise
+    # the UI silently falls back to raw step and error keys.
+    - |
+      python - <<'PY'
+      import json, sys, pathlib
+      base = pathlib.Path("custom_components/hass_claude_usage")
+      a = json.loads((base / "strings.json").read_text(encoding="utf-8"))
+      b = json.loads((base / "translations/en.json").read_text(encoding="utf-8"))
+      if a != b:
+          sys.exit("strings.json and translations/en.json have diverged")
+      print("translations are in sync")
+      PY
+
+# --- validate ---------------------------------------------------------
+
+# Mirrors the "Test Integration Load" job of the GitHub workflow. hassfest and
+# the HACS action are deliberately absent: both ship as GitHub Actions whose
+# containers expect the repository at /github/workspace, so they cannot be
+# reused here without a docker-in-docker runner.
+integration-loads:
+  stage: validate
+  image: python:3.12
+  script:
+    - pip install --quiet --root-user-action=ignore homeassistant
+    - mkdir -p build/custom_components
+    - cp -r $COMPONENT build/custom_components/
+    - cd build
+    - |
+      python - <<'PY'
+      from custom_components.hass_claude_usage import (
+          DOMAIN,
+          PLATFORMS,
+          async_setup_entry,
+          async_unload_entry,
+      )
+      from custom_components.hass_claude_usage import cliproxy, config_flow, sensor
+
+      print(f"imported {DOMAIN}, platforms: {PLATFORMS}")
+      assert config_flow.ClaudeUsageConfigFlow.VERSION == 2
+      assert hasattr(cliproxy, "async_api_call")
+      print("integration structure is valid")
+      PY
+
+# The manifest version is what the update check compares against, so a tag that
+# disagrees with it would ship a release users cannot upgrade to.
+# AGENTS.md documents bare tags ("10") but the existing tags are v-prefixed
+# ("v9"), so a leading "v" is accepted and stripped for the comparison.
+verify-version:
+  stage: validate
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - |
+      python - <<PY
+      import json, sys
+      version = json.load(open("$COMPONENT/manifest.json"))["version"]
+      tag = "$CI_COMMIT_TAG".lstrip("v")
+      if version != tag:
+          sys.exit(f"manifest version '{version}' does not match tag '$CI_COMMIT_TAG'")
+      print(f"manifest version matches tag: $CI_COMMIT_TAG")
+      PY
+
+# --- build ------------------------------------------------------------
+
+build-release:
+  stage: build
+  image: python:3.12
+  rules:
+    - if: $CI_COMMIT_TAG
+  variables:
+    GIT_DEPTH: 0 # release notes need the full history, not a shallow clone
+  script:
+    # Zip the integration folder itself, so it extracts straight into
+    # <config>/custom_components/ the way the README describes.
+    - |
+      python - <<'PY'
+      import pathlib, zipfile
+      src = pathlib.Path("custom_components/hass_claude_usage")
+      with zipfile.ZipFile("hass_claude_usage.zip", "w", zipfile.ZIP_DEFLATED) as z:
+          for path in sorted(src.rglob("*")):
+              if path.is_file() and "__pycache__" not in path.parts:
+                  z.write(path, pathlib.Path(src.name) / path.relative_to(src))
+          print("packaged:", len(z.namelist()), "files")
+      PY
+    - |
+      PREVIOUS=$(git describe --tags --abbrev=0 "${CI_COMMIT_TAG}^" 2>/dev/null || true)
+      {
+        echo "Install by extracting the attached zip into your Home Assistant"
+        echo "\`custom_components/\` directory, then restarting Home Assistant."
+        echo
+        echo "## Changes"
+        echo
+        if [ -n "$PREVIOUS" ]; then
+          git log --no-merges --pretty="- %s" "${PREVIOUS}..${CI_COMMIT_TAG}"
+          echo
+          echo "[Compare with ${PREVIOUS}](${CI_PROJECT_URL}/-/compare/${PREVIOUS}...${CI_COMMIT_TAG})"
+        else
+          echo "- Initial release from this repository"
+        fi
+      } > release_notes.md
+      cat release_notes.md
+    # Normalise the release name so both "10" and "v10" yield "v10".
+    - echo "BUILD_JOB_ID=$CI_JOB_ID" >> build.env
+    - echo "RELEASE_NAME=v${CI_COMMIT_TAG#v}" >> build.env
+  artifacts:
+    paths:
+      - hass_claude_usage.zip
+      - release_notes.md
+    reports:
+      dotenv: build.env
+    expire_in: never
+
+# --- release ----------------------------------------------------------
+
+# release-cli rather than the newer glab image: it reads release_notes.md when
+# "description" is a path, which glab only does behind an experimental flag.
+publish-release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG
+  needs:
+    - job: build-release
+      artifacts: true
+  script:
+    - echo "Publishing release $CI_COMMIT_TAG"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: $RELEASE_NAME
+    description: release_notes.md
+    ref: $CI_COMMIT_SHA
+    assets:
+      links:
+        - name: hass_claude_usage.zip
+          url: $CI_PROJECT_URL/-/jobs/$BUILD_JOB_ID/artifacts/file/hass_claude_usage.zip
+          link_type: package
