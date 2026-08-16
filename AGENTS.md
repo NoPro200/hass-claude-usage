@@ -25,6 +25,21 @@ Refactored from a standalone daemon concept originally explored in the `cc-playg
 - OAuth tokens can be refreshed automatically without user intervention
 - Matches the authentication pattern used by Claude Code CLI
 
+### Brand Images Ship With the Integration
+
+**Decision:** Provide `custom_components/<domain>/brand/icon.png` rather than submitting the domain
+to the `home-assistant/brands` repository.
+
+**Rationale:**
+- Since Home Assistant 2026.3 a custom integration can carry its own brand images, served through
+  `/api/brands/integration/<domain>/`, and local files take priority over the CDN
+- The brands repository now treats `custom_integrations/` as a legacy folder and auto-closes pull
+  requests against it, so that route is no longer available
+- The same path doubles as the asset HACS validation looks for
+
+**Consequence:** Home Assistant older than 2026.3 resolves brand images through the CDN only and
+will show no icon for this domain — the upstream domain is registered there, this fork's is not.
+
 ### CLIProxyAPI as an Alternative Transport
 
 **Decision:** Let an entry read usage through a [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)
@@ -422,6 +437,10 @@ This project uses **major version numbering only** (1, 2, 3...). No semver.
 - Version must be compatible with AwesomeVersion (simple integers work fine)
 
 ## Version History
+
+### v12 (2026-08-16)
+- Ships `brand/icon.png` in a release for the first time, so Home Assistant shows an icon for the
+  integration. The file landed after the v11 tag, so v11 had none.
 
 ### v11 (2026-08-16)
 - Renamed the domain to `nopro200_claude_usage` so this fork installs alongside the upstream
