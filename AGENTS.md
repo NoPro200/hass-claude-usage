@@ -438,6 +438,10 @@ This project uses **major version numbering only** (1, 2, 3...). No semver.
 
 ## Version History
 
+### v13 (2026-08-16)
+- Added `brand/dark_icon.png`, so the integration also has an icon on dark backgrounds. The
+  existing `icon.png` averages 26/255 luminance and only works against light ones.
+
 ### v12 (2026-08-16)
 - Ships `brand/icon.png` in a release for the first time, so Home Assistant shows an icon for the
   integration. The file landed after the v11 tag, so v11 had none.
